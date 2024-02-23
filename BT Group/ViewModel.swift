@@ -14,26 +14,25 @@ protocol ProfileListViewModelDelegate: AnyObject {
 class ProfileListViewModel {
     
     weak var delegate: ProfileListViewModelDelegate?
-    var profileDetailsArray = [NSDictionary]()
+    var profilesList: ProfilesList?
+    var profileDetailsArray = [ProfilesData]()
     var currentPageNo = 1
     var totalPageNo = 0
     
-    init(_ delegate: ProfileListViewModelDelegate) {
-        self.delegate = delegate
-    }
+    init() {}
     
     func makeAPICallToGetDetails(pageNo: Int) {
         let url = URL(string: "https://reqres.in/api/users?page=\(pageNo)")!
 
         let task = URLSession.shared.dataTask(with: url) { data, response, error in
-            guard error == nil, let data = data, let string = String(data: data, encoding: .utf8) else {
+            guard error == nil, let data = data, let profiles = try? JSONDecoder().decode(ProfilesList.self, from: data) else {
                 print(error ?? "Unknown error")
                 return
             }
-            let dict = self.convertToDictionary(text: string)
-            self.currentPageNo = dict?["page"] as? Int ?? 0
-            self.totalPageNo = dict?["total_pages"] as? Int ?? 0
-            self.profileDetailsArray = dict?["data"] as? [NSDictionary] ?? []
+            self.profilesList = profiles
+            self.currentPageNo = self.profilesList?.page ?? 0
+            self.totalPageNo = self.profilesList?.total_pages ?? 0
+            self.profileDetailsArray = self.profilesList?.data ?? []
             DispatchQueue.main.async {
                 self.delegate?.updateTableData()
             }

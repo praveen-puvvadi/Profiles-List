@@ -20,26 +20,64 @@ final class APITestCase: XCTestCase {
     }
 
     override func tearDown() {
+        super.tearDown()
         controller = nil
         apiManager = nil
-        super.tearDown()
     }
     
-    func testGestureReponse() {
-        controller.respondToSwipeGesture(gesture: UISwipeGestureRecognizer())
+    func testRightGestureReponse() {
+        let rightGesture = UISwipeGestureRecognizer()
+        rightGesture.direction = .right
+        controller.respondToSwipeGesture(gesture: rightGesture)
+    }
+    
+    func testLeftGestureReponse() {
+        let leftGesture = UISwipeGestureRecognizer()
+        leftGesture.direction = .left
+        controller.respondToSwipeGesture(gesture: leftGesture)
     }
 
     func testAPICallSuccess() {
         let expectation = XCTestExpectation(description: "API call should succeed")
-        apiManager.makeAPICallToGetDetails(pageNo: 1)
-        XCTAssertNotNil([String: Any]())
-        expectation.fulfill()
+        apiManager.networkingAPIHandler(urlString: Constants.getUserProfiles+"\(1)", completion: { status, profiles, error in
+            switch status {
+            case true:
+                XCTAssertNotNil(profiles)
+                expectation.fulfill()
+            case false:
+                XCTFail("API call failed with error: \(error.localizedDescription)")
+            }
+        })
     }
 
     func testAPICallFailure() {
         let expectation = XCTestExpectation(description: "API call should fail")
-        apiManager.makeAPICallToGetDetails(pageNo: 3)
-        XCTAssertNotNil("Failed")
-        expectation.fulfill()
+        apiManager.networkingAPIHandler(urlString: Constants.getUserProfiles+"\(3)", completion: { status, profiles, error in
+            switch status {
+            case true:
+                XCTFail("API call failed with error: \(error.localizedDescription)")
+            case false:
+                XCTAssertNotNil(profiles)
+                expectation.fulfill()
+            }
+        })
     }
+    
+    func testSwipeGestureAPI() {
+        controller.makeSwipeAPICall(page: 1)
+    }
+    
+    func testMakeAPICallInSwipe() {
+        apiManager.makeAPICallInSwipe(page: 1) {
+            //
+        }
+    }
+    
+    func testToastLabel() {
+        controller.showToastLabel(message: "Please check your internet connection!")
+    }
+    
+//    func testShowToastMessage(message: String) {
+//        controller.showToastMessage(message: "Testing Toast Label")
+//    }
 }

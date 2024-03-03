@@ -8,7 +8,9 @@
 import Foundation
 
 protocol ProfileListViewModelDelegate: AnyObject {
-    func updateTableData()
+    func showLoader()
+    func hideLoader()
+    func showToastMessage(message: String)
 }
 
 class ProfileListViewModel {
@@ -21,40 +23,52 @@ class ProfileListViewModel {
     
     init() {}
     
-    func makeAPICallToGetDetails(pageNo: Int) {
-        let url = URL(string: "https://reqres.in/api/users?page=\(pageNo)")!
+    func networkingAPIHandler(urlString: String, completion: @escaping (Bool, ProfilesList, Error) -> Void) {
+        let url = URL(string: urlString)!
 
         let task = URLSession.shared.dataTask(with: url) { data, response, error in
-            guard error == nil, let data = data, let profiles = try? JSONDecoder().decode(ProfilesList.self, from: data) else {
+            guard let data = data, let profiles = try? JSONDecoder().decode(ProfilesList.self, from: data) else {
                 print(error ?? "Unknown error")
                 return
             }
-            self.profilesList = profiles
-            self.currentPageNo = self.profilesList?.page ?? 0
-            self.totalPageNo = self.profilesList?.total_pages ?? 0
-            self.profileDetailsArray = self.profilesList?.data ?? []
-            DispatchQueue.main.async {
-                self.delegate?.updateTableData()
-            }
+            completion(error == nil ? true : false, profiles, error ?? NSError())
         }
         task.resume()
     }
     
-    func makeAPICallInSwipe(page: Int) {
-        if page != 0 {
-            profileDetailsArray.removeAll()
-            makeAPICallToGetDetails(pageNo: page)
-        }
+    func makeAPICallToGetDetails(pageNo: Int, completion: @escaping () -> Void) {
+        delegate?.showLoader()
+        networkingAPIHandler(urlString: Constants.getUserProfiles+"\(pageNo)", completion: { [weak self] status, profiles, error in
+            self?.delegate?.hideLoader()
+            switch status {
+            case true:
+                self?.profilesList = profiles
+                self?.currentPageNo = self?.profilesList?.page ?? 0
+                self?.totalPageNo = self?.profilesList?.total_pages ?? 0
+                if !(self?.profilesList?.data?.isEmpty ?? false) {
+                    self?.profileDetailsArray = self?.profilesList?.data ?? []
+                    completion()
+                } else {
+                    self?.delegate?.showToastMessage(message: "No more data!")
+                }
+            case false:
+                DispatchQueue.main.async {
+                    self?.delegate?.showToastMessage(message: "Something went wrong, Please try again!")
+                }
+            }
+        })
     }
     
-    private func convertToDictionary(text: String) -> [String: Any]? {
-        if let data = text.data(using: .utf8) {
-            do {
-                return try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
-            } catch {
-                print(error.localizedDescription)
+    func makeAPICallInSwipe(page: Int, completion: @escaping () -> Void) {
+        if Reachability.isConnectedToNetwork() {
+            if page != 0 {
+                profileDetailsArray.removeAll()
+                makeAPICallToGetDetails(pageNo: page) {
+                    completion()
+                }
             }
+        } else {
+            delegate?.showToastMessage(message: "Please check your internet connection!")
         }
-        return nil
     }
 }

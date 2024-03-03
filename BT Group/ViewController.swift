@@ -9,7 +9,8 @@ import UIKit
 
 class ViewController: UIViewController {
     
-    @IBOutlet weak var tableView: UITableView!
+    @IBOutlet weak var tableView: UITableView?
+    @IBOutlet weak var activityView: UIActivityIndicatorView?
     
     private var viewModel: ProfileListViewModel?
 
@@ -17,57 +18,73 @@ class ViewController: UIViewController {
         super.viewDidLoad()
         viewModel = ProfileListViewModel()
         viewModel?.delegate = self
-        tableView.dataSource = self
-        viewModel?.makeAPICallToGetDetails(pageNo: viewModel?.currentPageNo ?? 0)
+        activityView?.isHidden = true
+        tableView?.dataSource = self
+        addSwipeGestures()
         
+        if Reachability.isConnectedToNetwork() {
+            viewModel?.makeAPICallToGetDetails(pageNo: viewModel!.currentPageNo) {
+                DispatchQueue.main.async {
+                    self.tableView?.reloadData()
+                }
+            }
+        } else {
+            self.showToastLabel(message: "Please check your internet connection!")
+        }
+    }
+    
+    private func addSwipeGestures() {
         let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(respondToSwipeGesture))
         swipeRight.direction = .right
         self.view.addGestureRecognizer(swipeRight)
 
-        let swipeDown = UISwipeGestureRecognizer(target: self, action: #selector(respondToSwipeGesture))
-        swipeDown.direction = .left
-        self.view.addGestureRecognizer(swipeDown)
+        let swipeLeft = UISwipeGestureRecognizer(target: self, action: #selector(respondToSwipeGesture))
+        swipeLeft.direction = .left
+        self.view.addGestureRecognizer(swipeLeft)
     }
     
-    @objc func respondToSwipeGesture(gesture: UIGestureRecognizer) {
-        if let swipeGesture = gesture as? UISwipeGestureRecognizer {
-            switch swipeGesture.direction {
-            case .right:
-                print("Swiped right")
-                if viewModel?.currentPageNo ?? 0 < viewModel?.totalPageNo ?? 0 {
-                    viewModel?.makeAPICallInSwipe(page: (viewModel?.currentPageNo ?? 0)+1)
-                }
-            case .down:
-                print("Swiped down")
-            case .left:
-                print("Swiped left")
-                viewModel?.makeAPICallInSwipe(page: (viewModel?.currentPageNo ?? 0)-1)
-            case .up:
-                print("Swiped up")
-            default:
-                break
+    func makeSwipeAPICall(page: Int) {
+        viewModel?.makeAPICallInSwipe(page: page) {
+            DispatchQueue.main.async {
+                self.tableView?.reloadData()
             }
         }
     }
+    
+    @objc func respondToSwipeGesture(gesture: UISwipeGestureRecognizer) {
+        switch gesture.direction {
+        case .right:
+            print("Swiped right")
+            if viewModel?.currentPageNo ?? 0 < viewModel?.totalPageNo ?? 0 {
+                makeSwipeAPICall(page: (viewModel?.currentPageNo ?? 0)+1)
+            }
+        case .left:
+            print("Swiped left")
+            makeSwipeAPICall(page: (viewModel?.currentPageNo ?? 0)-1)
+        default:
+            break
+        }
+    }
 }
-
+// sumit.bansal@bt.com
 extension ViewController: UITableViewDataSource {
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return viewModel?.profileDetailsArray.count ?? 0
+        return viewModel!.profileDetailsArray.count
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let cell = tableView.dequeueReusableCell(withIdentifier: "DetailsListTableViewCell") as? DetailsListTableViewCell else { return UITableViewCell() }
+        let cell = tableView.dequeueReusableCell(withIdentifier: "DetailsListTableViewCell") as! DetailsListTableViewCell
         cell.profileImage.layer.cornerRadius = 8
-        let data = viewModel?.profileDetailsArray[indexPath.row]
-        let fullName = "\(data?.first_name as? String ?? "") \(data?.last_name as? String ?? "")"
-        cell.nameLabel.text = fullName
-        cell.emailLabel.text = data?.email as? String ?? ""
-        
-        if let url = URL(string: data?.avatar as? String ?? "") {
-            UIImage.loadFrom(url: url) { image in
-                cell.profileImage.image = image
+        if let data = viewModel?.profileDetailsArray[indexPath.row] {
+            let fullName = "\(data.first_name ?? "") \(data.last_name ?? "")"
+            cell.nameLabel.text = fullName
+            cell.emailLabel.text = data.email ?? ""
+            
+            if let url = URL(string: data.avatar ?? "") {
+                UIImage.loadFrom(url: url) { image in
+                    cell.profileImage.image = image
+                }
             }
         }
         return cell
@@ -76,7 +93,21 @@ extension ViewController: UITableViewDataSource {
 
 extension ViewController: ProfileListViewModelDelegate {
     
-    func updateTableData() {
-        tableView.reloadData()
+    func showLoader() {
+        DispatchQueue.main.async {
+            self.activityView?.isHidden = false
+            self.activityView?.startAnimating()
+        }
+    }
+    
+    func hideLoader() {
+        DispatchQueue.main.async {
+            self.activityView?.stopAnimating()
+            self.activityView?.isHidden = true
+        }
+    }
+    
+    func showToastMessage(message: String) {
+        self.showToastLabel(message: message)
     }
 }

@@ -20,9 +20,9 @@ final class APITestCase: XCTestCase {
     }
 
     override func tearDown() {
-        super.tearDown()
         controller = nil
         apiManager = nil
+        super.tearDown()
     }
     
     func testRightGestureReponse() {
@@ -76,8 +76,4 @@ final class APITestCase: XCTestCase {
     func testToastLabel() {
         controller.showToastLabel(message: "Please check your internet connection!")
     }
-    
-//    func testShowToastMessage(message: String) {
-//        controller.showToastMessage(message: "Testing Toast Label")
-//    }
 }
